@@ -1,4 +1,5 @@
 const text = document.querySelector("textarea");
+const notif = document.getElementById('notification');
 const fInput = document.getElementById("fInput")
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
@@ -7,7 +8,8 @@ var W = 5, res = window.innerHeight * 0.65;
 const t = Math.floor(res * 3e-3), delay = 0;
 var base = new Array(4).fill(true), grid;
 
-function ResetGrid() {
+function ResetGrid() 
+{
 	grid = Array.from({ length: W },
 		(_, r) => Array.from({ length: W },
 			(_, c) => new Cell(r, c, [...base])
@@ -17,8 +19,10 @@ function ResetGrid() {
 
 // save an int array as maze file
 
-async function SaveBinary(name, typename, arr) {
-	try {
+async function SaveBinary(name, typename, arr) 
+{
+	try 
+	{
 		var handle = await window.showSaveFilePicker({
 			suggestedName: name,
 			types: [{
@@ -26,8 +30,13 @@ async function SaveBinary(name, typename, arr) {
 				accept: { "application/octet-stream": ["." + name.split('.')[1]] },
 			}],
 		});
+		ShowNotif("💾 Exported Maze", "#256f25");
 	}
-	catch { return };
+	catch 
+	{
+		console.log("aborted saving.");
+		return;
+	};
 
 	const stream = await handle.createWritable();
 	const OCTET = "application/octet-stream;charset=ISO-8859-1";
@@ -37,7 +46,8 @@ async function SaveBinary(name, typename, arr) {
 
 // data structure
 
-function Cell(row, col, walls) {
+function Cell(row, col, walls) 
+{
 	this.x = col; this.y = row;
 	this.walls = walls;
 
@@ -50,11 +60,10 @@ function Cell(row, col, walls) {
 
 // render the maze on the canvas
 
-function renderGrid(cx = -1, cy = -1) {
+function renderGrid(cx = -1, cy = -1) 
+{
 	canvas.width = canvas.height = res;
-	//canvas.style.borderWidth = t/2;
 	const step = canvas.height / W, cstep = Math.ceil(step);
-	//canvas.style.display = "unset";
 
 	for (let r = 0; r < W; r++) {
 		for (let c = 0; c < W; c++) {
@@ -77,13 +86,15 @@ function renderGrid(cx = -1, cy = -1) {
 	}
 }
 
-function DFSIteration(selected, data, counter, dir) {
+function DFSIteration(selected, data, counter, dir) 
+{
 	selected.visited = true;
 
 	// generate a list of valid neighbors
 
 	var neighbors = []; offsets = [[-1, 0], [0, 1], [1, 0], [0, -1]];
-	for (let o = 0; o < 4; o++) {
+	for (let o = 0; o < 4; o++) 
+	{
 		let newPos = [selected.x + offsets[o][1], selected.y + offsets[o][0]];
 		neighbors.push((
 			newPos[0] > -1 && newPos[0] < W &&
@@ -94,7 +105,8 @@ function DFSIteration(selected, data, counter, dir) {
 
 	// no valid moves, shift backward
 
-	if ((neighbors[0] + neighbors[1] + neighbors[2] + neighbors[3]) == -4) {
+	if ((neighbors[0] + neighbors[1] + neighbors[2] + neighbors[3]) == -4) 
+	{
 		selected = selected.previous;
 		return [counter, selected, dir];
 	}
@@ -102,21 +114,19 @@ function DFSIteration(selected, data, counter, dir) {
 	// calculate the next direction
 
 	var nextCell = -1;
-	if (counter < data.length) {
+	if (counter < data.length) 
+	{
 		dir = ((dir + data[counter] % 4) + 4) % 4;
 		nextCell = neighbors[dir];
-
-		if (nextCell != -1) {
-			console.log("Encoded Array Element!");
-			counter++;
-		}
+		if (nextCell != -1) counter++;
 	}
 
 	// if next arr element invalid find random valid move
 	// tell the deocoder that it is random and should not be used
 
 	let attempt = 0;
-	while (nextCell == -1) {
+	while (nextCell == -1) 
+	{
 		dir = Math.round(Math.random() * 3);
 		nextCell = neighbors[dir];
 	}
@@ -142,44 +152,83 @@ function DFSIteration(selected, data, counter, dir) {
 	return [counter, nextCell, dir];
 }
 
+// Notification
+
+function ShowNotif(message, color="#6f2525")
+{
+	if (notif.ACTIVE) return;
+	notif.ACTIVE = true;
+	notif.style.top = '3%';
+
+	notif.style.color = color;
+	notif.style.borderColor = color;
+	notif.innerText = message;
+
+	setTimeout(() => 
+	{
+		notif.ACTIVE = false;
+		notif.style.top = '-5%';
+	}, 3100);
+}
+
 // Import Button
 
-fInput.addEventListener('change', function () {
+function DecodeMaze (content)
+{
+	// extract the maze structure
+
+	var bytes = [], isW = true;
+	for (const char of content)
+	{
+		if (isW)
+		{
+			W = char.charCodeAt();
+			isW = false;
+			continue;
+		}
+
+		let byte = char.charCodeAt().toString(2);
+		byte = "0".repeat(8 - byte.length) + byte;
+		bytes.push(byte.substr(0,4));
+
+		let t = byte.substr(4)
+		if (t != '0000') bytes.push(t);
+	};
+
+	bytes.forEach((walls, idx) => 
+	{
+		let r = Math.floor(idx / W);
+		let c = idx % W;
+		grid[r][c].walls = walls.split('').map(x => (x == '1'));
+	});
+
+	// we now have a full maze, extract the text inside
+
+	renderGrid(-1, -1);
+}
+
+fInput.addEventListener('change', () =>
+{
 	const file = fInput.files[0];
 	const reader = new FileReader();
 
 	if (file.size > 1e5) return;
 	const ext = file.name.split('.').pop();
-	
+
 	reader.onload = (e) =>
 	{
-		if (ext == 'txt') text.value = e.target.result.toString(2)
-		else if (ext == 'maze')
+		switch (ext)
 		{
-			var bytes = [], isW = true;
-			for (const char of e.target.result)
-			{
-				if (isW)
-				{
-					W = char.charCodeAt();
-					isW = false;
-					console.log("Set Width:", W);
-					continue;
-				}
-
-				let byte = char.charCodeAt().toString(2);
-				byte.padStart('0', 8);
-				bytes.push(byte.substr(0,4), byte.substr(4));
-			};
-
-			bytes.forEach((walls, idx) => 
-			{
-				let r = Math.floor(idx / W);
-				let c = idx % W;
-				grid[r][c].walls = walls.split('').map(x => (x == '1'));
-			});
-
-			renderGrid(-1, -1);
+			case 'txt':
+				ShowNotif("📥 Imported Text", "#256f25");
+				text.value = e.target.result.toString(2);
+				break;
+			case 'maze':
+				ShowNotif("📥 Imported Maze", "#256f25");
+				DecodeMaze(e.target.result);
+				break;
+			default:
+				break;
 		}
 	}
 
@@ -188,7 +237,8 @@ fInput.addEventListener('change', function () {
 
 // Export Button
 
-document.getElementById("save").onclick = () => {
+document.getElementById("save").onclick = () => 
+{
 	var arr = [W], buffer = ''; // 1 byte for the width
 
 	for (let r = 0; r < W; r++) 
@@ -220,75 +270,102 @@ document.getElementById("save").onclick = () => {
 text.addEventListener("dragenter", () => {
 	text.style.borderStyle = 'dashed';
 }, false);
-
 text.addEventListener("dragleave", () => {
 	text.style.borderStyle = 'solid';
 }, false);
 
-function droppedFile(e) {
+function droppedFile(e) 
+{
+	text.style.borderStyle = 'solid';
 	e.preventDefault();
 
 	const file = e.dataTransfer.files[0];
 	const reader = new FileReader();
 
-	if (!file.type.startsWith('text') || file.size > 1e5) return;
+	if (!file.type.startsWith('text') || file.size > 1e5)
+	{
+		ShowNotif("Invalid File Dropped.");
+		return;
+	}
+
+	ShowNotif("📥 Imported File", "#256f25");
+
 	reader.onload = (e) => text.value = e.target.result;
 	reader.readAsText(file);
 }
 
 // Generate maze from textarea value
 
-function GenerateMaze(isAnimated) {
-	// Convert the letters into 5 ternary digits (base 3)
-
+function GenerateMaze(isAnimated, retries=0) 
+{
 	data = [];
 
-	for (const char of text.value || "") {
-		let trit5 = (char.charCodeAt() - 32).toString(3);
+	// Convert the letters into 5 ternary digits (base 3)
 
-		if (trit5.length > 5) {
-			alert("Invalid character detected!");
+	for (const char of text.value || "") 
+	{
+		let trit5 = (char.charCodeAt()-32).toString(3);
+
+		if (trit5.length > 5) 
+		{
+			ShowNotif("Invalid character(s) detected.")
 			return;
 		}
 
-		trit5 = "0".repeat(5 - trit5.length) + trit5;
+		trit5 = (trit5=='-211') ? "11000" : trit5.padStart(5, '0');
 		for (const trit of trit5) data.push(trit - 1)
 	};
 
+	//console.log("about to encode into maze:", data)
+
 	ResetGrid();
 	var start = [Math.floor(W / 2), Math.floor(W / 2)]
-	var cursor = grid[start[1]][start[0]], counter = 0, dir = 0;
+	var cursor = grid[start[1]][start[0]], successful = 0, dir = 0;
 
-	while (true) {
-		let output = DFSIteration(cursor, data, counter, dir);
-		counter = output[0]; cursor = output[1]; dir = output[2];
+	while (true) 
+	{
+		let output = DFSIteration(cursor, data, successful, dir);
+		successful = output[0]; cursor = output[1]; dir = output[2];
 		if (cursor.x == start[0] && cursor.y == start[1]) break;
 	}
+
+	// change succesful to be a bool indicating whether an array element was encoded
+
+	if (successful != data.length)
+	{
+		if (retries > 30) W++;
+		GenerateMaze(false, retries+1);
+		return;
+	}
+
+	if (successful>0) ShowNotif("🥳 Generated Maze", "#256f25")
 	renderGrid(-1, -1);
 };
 
-document.getElementById("convert").onclick = GenerateMaze;
+document.getElementById("convert").onclick = () =>
+{
+	// Estimate how big the maze needs to be 
+	if (text.value.length > 0) W = Math.ceil(Math.sqrt(text.value.length*8));
+	GenerateMaze();
+}
 
 // Generate a blank maze
 
 GenerateMaze();
 
-// var sampleData = [-1, 0, 1, -1, 0, 1];
-// regularGenerate(sampleData);
+// function AnimateGeneration(data) {
+// 	renderGrid(selected.x, selected.y);
+// 	DFSIteration(data);
 
-function AnimateGeneration(data) {
-	renderGrid(selected.x, selected.y);
-	DFSIteration(data);
+// 	if ((selected.x === start[0] && selected.y === start[1] && first === false)) {
+// 		renderGrid(-1, -1);
+// 		console.log("Made " + decisions + " decisions.");
+// 		return;
+// 	}
 
-	if ((selected.x === start[0] && selected.y === start[1] && first === false)) {
-		renderGrid(-1, -1);
-		console.log("Made " + decisions + " decisions.");
-		return;
-	}
-
-	first = false;
-	setTimeout(AnimateGeneration, delay, data);
-}
+// 	first = false;
+// 	setTimeout(AnimateGeneration, delay, data);
+// }
 
 // if (delay > 0) { /*AnimateGeneration(sampleData)*/ }
 // else {  };
