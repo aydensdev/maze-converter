@@ -1,0 +1,32 @@
+<html>
+    <head>
+        <title>Maze Generation</title>
+        <link rel="stylesheet" href="./styles.css"></link>
+        <style>
+            
+        </style>
+    </head>
+    <body>
+        <div id="notification">Invalid character detected.</div>
+        <div id="content">
+            <h1>Text to Maze Converter</h1>
+            <textarea ondrop="droppedFile(event);" class="element" placeholder="📋 Paste text or drag & drop text file..."></textarea>
+            <div id="actions">
+                <input type="file" id="fInput" accept=".maze, .txt">
+                <label class="element import" for="fInput" class="custom-file-upload">
+                    📦 Import
+                </label>
+                    
+                </button>
+                <button class="element generate" id="convert">🔮 Generate!</button>
+                <button class="element savemaze" id="save">🚀 Export</button>
+                <select class="element dropdown">
+                    <option>Maze</option>
+                    <option>Text</option>
+                </select>
+            </div>
+            <canvas class="element"></canvas>
+        </div>
+        <script src="main.js"></script>
+    </body>
+</html>
